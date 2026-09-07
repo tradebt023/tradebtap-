@@ -40,6 +40,10 @@ function normalizeAnalysisPlan(payload:unknown, symbol=''):AnalysisPlan|null {
   }
 }
 
+function isCompleteAnalysisPlan(plan:AnalysisPlan|null):plan is AnalysisPlan {
+  return Boolean(plan && ['LONG','SHORT'].includes(plan.direction) && [plan.entry,plan.stop_loss,plan.tp1,plan.tp2,plan.tp3].every(value => Number.isFinite(value) && value > 0))
+}
+
 type DemoStatus = {
   version:string
   mode:string
@@ -434,7 +438,12 @@ export default function BinanceDemo({active,symbol,analysis,chart,markets,onSymb
         if (!response.ok) throw new Error(apiErrorMessage(payload && typeof payload === 'object' && 'detail' in payload ? payload.detail : payload))
         plan = normalizeAnalysisPlan(payload,symbol)
       }
-      if (!plan || !['LONG','SHORT'].includes(plan.direction)) throw new Error('Analysis unavailable for this symbol.')
+      if (!isCompleteAnalysisPlan(plan) && v21?.scanner) {
+        const candidates = [...(v21.scanner.top_candidates || []),...(v21.scanner.all_candidates || [])]
+        const candidate = candidates.find(item => item.symbol.toUpperCase() === symbol.toUpperCase() && ['LONG','SHORT'].includes(item.direction.toUpperCase()) && [item.entry,item.stop_loss,item.tp1,item.tp2,item.tp3].every(value => Number.isFinite(value) && value > 0))
+        if (candidate) plan = normalizeAnalysisPlan(candidate,symbol)
+      }
+      if (!isCompleteAnalysisPlan(plan)) throw new Error('Güvenli işlem yönü oluşmadı. Güncel analiz tekrar kontrol edilebilir.')
       const levels = [plan.entry,plan.stop_loss,plan.tp1,plan.tp2,plan.tp3]
       if (levels.some(value => !Number.isFinite(value) || value <= 0)) throw new Error('Analiz planında geçerli giriş, Stop ve TP seviyeleri bulunamadı.')
       const ordered = plan.direction === 'LONG'
