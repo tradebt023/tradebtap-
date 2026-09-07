@@ -14,26 +14,29 @@ type AnalysisPlan = {
   tp3:number
 }
 
-type AnalysisPlanPayload = Partial<AnalysisPlan> & {normalized_signal?:unknown;analysis?:unknown;plan?:unknown}
+type AnalysisPlanPayload = Partial<AnalysisPlan> & {normalized_signal?:unknown;status?:unknown;stop?:unknown;stopLoss?:unknown;take_profit?:unknown;target1?:unknown;target2?:unknown;target3?:unknown;analysis?:unknown;plan?:unknown;results?:unknown}
 
-function normalizeAnalysisPlan(payload:unknown):AnalysisPlan|null {
+function normalizeAnalysisPlan(payload:unknown, symbol=''):AnalysisPlan|null {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null
   const row = payload as AnalysisPlanPayload
+  const resultRows = Array.isArray(row.results) ? row.results.filter(item => item && typeof item === 'object') as AnalysisPlanPayload[] : []
+  const result = resultRows.find(item => String(item.symbol || '').toUpperCase() === symbol.toUpperCase()) || resultRows[0]
   const nested = row.analysis && typeof row.analysis === 'object' && !Array.isArray(row.analysis)
     ? row.analysis as AnalysisPlanPayload
     : row.plan && typeof row.plan === 'object' && !Array.isArray(row.plan)
       ? row.plan as AnalysisPlanPayload
-      : row
+      : result || row
   const rawDirection = String(nested.direction || nested.normalized_signal || '').trim().toUpperCase()
   const direction = rawDirection === 'LONG' || rawDirection === 'BUY'
     ? 'LONG' : rawDirection === 'SHORT' || rawDirection === 'SELL' ? 'SHORT' : 'BEKLE'
+  const stop = nested.stop_loss ?? nested.stop ?? nested.stopLoss
   return {
     direction,
     entry:Number(nested.entry),
-    stop_loss:Number(nested.stop_loss),
-    tp1:Number(nested.tp1),
-    tp2:Number(nested.tp2),
-    tp3:Number(nested.tp3),
+    stop_loss:Number(stop),
+    tp1:Number(nested.tp1 ?? nested.target1),
+    tp2:Number(nested.tp2 ?? nested.target2),
+    tp3:Number(nested.tp3 ?? nested.target3),
   }
 }
 
@@ -424,12 +427,12 @@ export default function BinanceDemo({active,symbol,analysis,chart,markets,onSymb
   const fillFromAnalysis = async () => {
     setBusy(true);setMessageKind('info');setMessage('Güncel analiz planı alınıyor…')
     try {
-      let plan = normalizeAnalysisPlan(analysis)
+      let plan = normalizeAnalysisPlan(analysis,symbol)
       if (!plan || plan.direction === 'BEKLE') {
         const response = await fetch(`${API_BASE}/analysis/${symbol}?interval=15m`)
         const payload = await response.json().catch(() => null) as unknown
         if (!response.ok) throw new Error(apiErrorMessage(payload && typeof payload === 'object' && 'detail' in payload ? payload.detail : payload))
-        plan = normalizeAnalysisPlan(payload)
+        plan = normalizeAnalysisPlan(payload,symbol)
       }
       if (!plan || !['LONG','SHORT'].includes(plan.direction)) throw new Error('Analysis unavailable for this symbol.')
       const levels = [plan.entry,plan.stop_loss,plan.tp1,plan.tp2,plan.tp3]
