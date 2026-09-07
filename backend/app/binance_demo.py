@@ -201,7 +201,16 @@ def load_demo_credentials() -> tuple[str, str]:
     return api_key, secret_key
 
 
-def credentials_configured() -> bool:
+def credentials_configured(request: Request | None = None) -> bool:
+    if request is not None:
+        try:
+            from .exchange_connections import session_credentials_for_request
+
+            api_key, secret_key = session_credentials_for_request(request, "TESTNET")
+            if api_key and secret_key:
+                return True
+        except (ImportError, RuntimeError, ValueError):
+            pass
     api_key, secret_key = load_demo_credentials()
     return len(api_key) >= 10 and len(secret_key) >= 10
 
@@ -372,7 +381,14 @@ class BinanceDemoClient:
 
 
 def client_for(request: Request) -> BinanceDemoClient:
-    api_key, secret_key = load_demo_credentials()
+    try:
+        from .exchange_connections import session_credentials_for_request
+
+        api_key, secret_key = session_credentials_for_request(request, "TESTNET")
+    except (ImportError, RuntimeError, ValueError):
+        api_key, secret_key = "", ""
+    if not api_key or not secret_key:
+        api_key, secret_key = load_demo_credentials()
     return BinanceDemoClient(request.app.state.http, api_key, secret_key)
 
 
@@ -1241,7 +1257,15 @@ async def shutdown_binance_demo(application: Any) -> None:
 
 @router.get("/status")
 async def demo_status(request: Request) -> dict[str, Any]:
-    return public_status(state_for(request))
+    try:
+        from .exchange_connections import ensure_session_cache
+
+        await ensure_session_cache(request)
+    except (ImportError, RuntimeError, ValueError):
+        pass
+    result = public_status(state_for(request))
+    result["configured"] = credentials_configured(request)
+    return result
 
 
 @router.post("/connect")

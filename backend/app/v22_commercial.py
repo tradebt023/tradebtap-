@@ -1105,6 +1105,12 @@ async def v22_subscription_cancel(request: Request):
 async def v22_logout(request: Request):
     user = authenticated_user(request)
     rt = runtime(request)
+    try:
+        from .exchange_connections import clear_session_vault_for_request
+
+        await clear_session_vault_for_request(request)
+    except (ImportError, RuntimeError, ValueError):
+        pass
     async with rt["lock"]:
         user["auth_version"] = int(user.get("auth_version", 1)) + 1
         save_state(rt["state"])

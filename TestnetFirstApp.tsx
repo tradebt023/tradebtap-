@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { CandlestickSeries, ColorType, createChart, HistogramSeries, LineSeries, type IPriceLine } from 'lightweight-charts'
 import { Activity, ArrowUp, Bell, CheckCircle2, CircleDollarSign, Cloud, CloudCog, KeyRound, LockKeyhole, Menu, RadioTower, RefreshCw, Save, ShieldCheck, Sparkles, TestTube2, X } from 'lucide-react'
-import { API_BASE } from './api'
+import { API_BASE, userSessionToken } from './api'
 import CoinAnalysisCenter from './CoinAnalysisCenter'
 
 const BinanceDemo = lazy(() => import('./BinanceDemo'))
@@ -178,7 +178,8 @@ export default function TestnetFirstApp() {
 
   const refreshConnectionStatus = async () => {
     try {
-      const response = await fetch(`${API_BASE}/exchange-connections/status`)
+      const headers = new Headers(); const token = userSessionToken(); if (token) headers.set('Authorization',`Bearer ${token}`)
+      const response = await fetch(`${API_BASE}/exchange-connections/status`,{headers})
       if (response.ok) setConnectionStatus(await response.json() as ConnectionStatus)
     } catch {}
   }
@@ -192,8 +193,9 @@ export default function TestnetFirstApp() {
     }
     setDemoVerification({busy:true,kind:'info',message:'Demo anahtarları doğrulanıyor ve güvenli kasaya kaydediliyor…'})
     try {
+      const headers = new Headers({'Content-Type':'application/json'}); const token = userSessionToken(); if (token) headers.set('Authorization',`Bearer ${token}`)
       const saveResponse = await fetch(`${API_BASE}/exchange-connections/save`,{
-        method:'POST',headers:{'Content-Type':'application/json'},
+        method:'POST',headers,
         body:JSON.stringify({mode:'TESTNET',api_key:apiKey,secret_key:secretKey,confirmation:'TESTNET KASAYA KAYDET'}),
       })
       const savePayload = await saveResponse.json().catch(() => null) as {detail?:unknown}|null
@@ -209,10 +211,11 @@ export default function TestnetFirstApp() {
   const verifyDemoConnection = async () => {
     setDemoVerification({busy:true,kind:'info',message:'Kayıtlı Demo bağlantısı doğrulanıyor…'})
     try {
-      const testResponse = await fetch(`${API_BASE}/exchange-connections/test`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'TESTNET'})})
+      const headers = new Headers({'Content-Type':'application/json'}); const token = userSessionToken(); if (token) headers.set('Authorization',`Bearer ${token}`)
+      const testResponse = await fetch(`${API_BASE}/exchange-connections/test`,{method:'POST',headers,body:JSON.stringify({mode:'TESTNET'})})
       const testPayload = await testResponse.json().catch(() => null) as {detail?:unknown}|null
       if (!testResponse.ok) throw new Error(typeof testPayload?.detail === 'string' ? testPayload.detail : 'Saved Demo connection could not be verified.')
-      const activateResponse = await fetch(`${API_BASE}/exchange-connections/activate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'TESTNET',confirmation:'TESTNET BAĞLANTIYI AÇ'})})
+      const activateResponse = await fetch(`${API_BASE}/exchange-connections/activate`,{method:'POST',headers,body:JSON.stringify({mode:'TESTNET',confirmation:'TESTNET BAĞLANTIYI AÇ'})})
       const activatePayload = await activateResponse.json().catch(() => null) as {detail?:unknown}|null
       if (!activateResponse.ok) throw new Error(typeof activatePayload?.detail === 'string' ? activatePayload.detail : 'Demo connection could not be activated.')
       setDemoVerification({busy:false,kind:'ok',message:'DEMO CONNECTED · API connection verified. Trading channel: DEMO.'})

@@ -209,6 +209,10 @@ export default function AuthGate({children}:{children:ReactNode}) {
   }
 
   const logout = async () => {
+    const sessionToken = token
+    if (sessionToken) {
+      try { await fetch(`${API_BASE}/exchange-connections/session`,{method:'DELETE',headers:{Authorization:`Bearer ${sessionToken}`}}) } catch {}
+    }
     try { if (token) await request('/auth/logout',{method:'POST',headers:{Authorization:`Bearer ${token}`}}) } catch { /* local logout still clears the session */ }
     clearUserSessionToken(); setMemberMenuOpen(false); setToken(''); setSession(null); setMode('login'); setMessage('Oturum kapatıldı.')
   }

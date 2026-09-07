@@ -139,6 +139,14 @@ class V22CommercialTests(unittest.TestCase):
         self.assertIn('"SESSIONS_REVOKED"', source)
         self.assertIn('"USER_PERMANENTLY_DELETED"', source)
 
+    def test_exchange_credentials_are_session_scoped_and_cleared_on_logout(self):
+        exchange_source = (BACKEND / "app" / "exchange_connections.py").read_text(encoding="utf-8")
+        self.assertIn("protrebot_exchange_session_vault", exchange_source)
+        self.assertIn("session_id TEXT NOT NULL", exchange_source)
+        self.assertIn('await pool.execute("DELETE FROM protrebot_exchange_session_vault WHERE session_id = $1"', exchange_source)
+        self.assertIn("await clear_session_vault_for_request(request)", V22_SOURCE)
+        self.assertIn("Authorization:`Bearer ${sessionToken}`", (ROOT / "AuthGate.tsx").read_text(encoding="utf-8"))
+
     def test_trading_account_endpoint_enforces_owner_and_returns_empty_without_accounts(self):
         from fastapi import HTTPException
 
