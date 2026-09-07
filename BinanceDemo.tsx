@@ -901,7 +901,7 @@ export default function BinanceDemo({active,symbol,analysis,chart,markets,onSymb
     </section>}
 
     {!status?.configured && <section className="demoSetupCard">
-      <div><LockKeyhole/><span><b>Anahtarlar tarayıcıya yazılmaz</b><p>Proje klasöründeki <strong>BINANCE-DEMO-AYARLA.bat</strong> dosyasına çift tıklayın. Açılan siyah yerel pencereye Demo API Key ve Secret Key’i yapıştırın; sonra ProTreBot’u yeniden başlatın.</p></span></div>
+      <div><LockKeyhole/><span><b>Anahtarlar tarayıcıya yazılmaz</b><p>Demo/Testnet kimlik bilgileri güvenli backend ortamında yapılandırılmalıdır. Bağlantı hazır olduğunda bu panelden test edebilirsiniz.</p></span></div>
       <button onClick={refreshStatus}><RefreshCw/> AYARI YENİDEN KONTROL ET</button>
     </section>}
 
