@@ -1,6 +1,6 @@
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { Activity, BarChart3, Bell, Calculator, CheckCircle2, ChevronDown, CircleDollarSign, ClipboardList, Crosshair, Gauge, History, LayoutDashboard, LockKeyhole, Play, Radar, Radio, RefreshCw, Save, Search, Send, Settings2, ShieldCheck, Sparkles, Target, TestTube2, TriangleAlert, UnlockKeyhole, Wallet, X, Zap } from 'lucide-react'
-import { API_BASE } from './api'
+import { API_BASE, loadDemoCredentials, saveDemoCredentials } from './api'
 
 const API = `${API_BASE}/binance-demo`
 const V21_API = `${API_BASE}/v21`
@@ -288,6 +288,7 @@ export default function BinanceDemo({active,symbol,analysis,chart,markets,onSymb
   const [status,setStatus] = useState<DemoStatus|null>(null)
   const [account,setAccount] = useState<DemoAccount|null>(null)
   const [form,setForm] = useState<FormState>(initialForm)
+  const [demoCredentials,setDemoCredentials] = useState(loadDemoCredentials)
   const [armText,setArmText] = useState('')
   const [busy,setBusy] = useState(false)
   const [message,setMessage] = useState('Önce bağlantıyı test edin; ardından analiz planını doğrulayın.')
@@ -324,6 +325,39 @@ export default function BinanceDemo({active,symbol,analysis,chart,markets,onSymb
       if (!payload.configured) setAccount(null)
       return payload
     } catch { setStatus(null); return null }
+  }
+  useEffect(() => { setDemoCredentials(loadDemoCredentials()) },[active])
+
+  const saveDemoConnection = async () => {
+    const apiKey = demoCredentials.apiKey.trim(); const secretKey = demoCredentials.secretKey.trim()
+    if (!apiKey || !secretKey) { setMessage('Demo API Key ve Secret Key gerekli.'); setMessageKind('error'); return }
+    setBusy(true); setMessageKind('info'); setMessage('Demo credential kaydediliyor…')
+    try {
+      const response = await fetch(`${API_BASE}/exchange-connections/save`,{method:'POST',body:JSON.stringify({mode:'TESTNET',api_key:apiKey,secret_key:secretKey,confirmation:'TESTNET KASAYA KAYDET'})})
+      const payload = await response.json().catch(() => null) as {detail?:unknown}|null
+      if (!response.ok) throw new Error(typeof payload?.detail === 'string' ? payload.detail : 'Demo credential kaydedilemedi.')
+      saveDemoCredentials(apiKey,secretKey); await refreshStatus(); setMessage('Demo API credential güvenli şekilde kaydedildi.'); setMessageKind('ok')
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Demo credential kaydedilemedi.'); setMessageKind('error') }
+    finally { setBusy(false) }
+  }
+
+  const testDemoConnection = async () => {
+    const apiKey = demoCredentials.apiKey.trim(); const secretKey = demoCredentials.secretKey.trim()
+    if (!apiKey || !secretKey) { setMessage('Önce Demo API Key ve Secret Key girin.'); setMessageKind('error'); return }
+    setBusy(true); setMessageKind('info'); setMessage('Demo bağlantısı doğrulanıyor…')
+    try {
+      const testResponse = await fetch(`${API_BASE}/exchange-connections/test`,{method:'POST',body:JSON.stringify({mode:'TESTNET',api_key:apiKey,secret_key:secretKey})})
+      const testPayload = await testResponse.json().catch(() => null) as {detail?:unknown}|null
+      if (!testResponse.ok) throw new Error(typeof testPayload?.detail === 'string' ? testPayload.detail : 'Demo bağlantısı doğrulanamadı.')
+      const saveResponse = await fetch(`${API_BASE}/exchange-connections/save`,{method:'POST',body:JSON.stringify({mode:'TESTNET',api_key:apiKey,secret_key:secretKey,confirmation:'TESTNET KASAYA KAYDET'})})
+      if (!saveResponse.ok) throw new Error('Demo credential kaydedilemedi.')
+      saveDemoCredentials(apiKey,secretKey)
+      const activateResponse = await fetch(`${API_BASE}/exchange-connections/activate`,{method:'POST',body:JSON.stringify({mode:'TESTNET',confirmation:'TESTNET BAĞLANTIYI AÇ'})})
+      if (!activateResponse.ok) throw new Error('Demo bağlantısı aktifleştirilemedi.')
+      await apiCall('/connect',{method:'POST'}); await refreshStatus()
+      setMessage('DEMO BAĞLI · Binance Demo/Testnet bağlantısı doğrulandı.'); setMessageKind('ok')
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Demo bağlantısı doğrulanamadı.'); setMessageKind('error') }
+    finally { setBusy(false) }
   }
   const refreshAccount = async (quiet=true) => {
     const requestId = ++accountRefreshId.current
@@ -909,10 +943,11 @@ export default function BinanceDemo({active,symbol,analysis,chart,markets,onSymb
       <article className="v21DailyCoach" aria-label="Daily trading coach"><header><div><span>DAILY TRADING COACH</span><h2>Review insight</h2></div><ClipboardList/></header>{coachTrades.length ? <><p className="v21CoachObservation">Observation: {coachTrades.length} journal outcomes are available for review.</p><div className="v21CoachInsights"><span><small>BEST TRADE</small><b>{fmt(coachBest)} USDT</b></span><span><small>WORST TRADE</small><b>{fmt(coachWorst)} USDT</b></span><span><small>WIN / LOSS</small><b>{coachTrades.filter(item => (item.realized_pnl ?? 0) > 0).length} / {coachTrades.filter(item => (item.realized_pnl ?? 0) < 0).length}</b></span></div><small className="v21CoachNote">Use this as a review observation, not financial advice.</small></> : <div className="v21CoachEmpty">Not enough trading history for a reliable daily review.</div>}</article>
     </section>}
 
-    {!status?.configured && <section className="demoSetupCard">
-      <div><LockKeyhole/><span><b>Anahtarlar tarayıcıya yazılmaz</b><p>Demo/Testnet kimlik bilgileri güvenli backend ortamında yapılandırılmalıdır. Bağlantı hazır olduğunda bu panelden test edebilirsiniz.</p></span></div>
-      <button onClick={refreshStatus}><RefreshCw/> AYARI YENİDEN KONTROL ET</button>
-    </section>}
+    <section className="demoSetupCard">
+      <div><LockKeyhole/><span><b>Binance Demo / Testnet hesabın</b><p>Kendi hesabının API Key ve Secret Key değerlerini gir. Credential’lar kullanıcı hesabın için saklanır ve Demo/Testnet dışına çıkmaz.</p></span></div>
+      <div className="demoCredentialFields"><input aria-label="Demo API Key" value={demoCredentials.apiKey} onChange={event => setDemoCredentials(current => ({...current,apiKey:event.target.value}))} autoComplete="off" placeholder="Demo API Key"/><input aria-label="Demo Secret Key" type="password" value={demoCredentials.secretKey} onChange={event => setDemoCredentials(current => ({...current,secretKey:event.target.value}))} autoComplete="new-password" placeholder="Demo Secret Key"/></div>
+      <div className="demoCredentialActions"><button onClick={() => void saveDemoConnection()} disabled={busy || !demoCredentials.apiKey || !demoCredentials.secretKey}><Save/> KAYDET</button><button onClick={() => void testDemoConnection()} disabled={busy || !demoCredentials.apiKey || !demoCredentials.secretKey}><Radio/> BAĞLANTIYI TEST ET</button></div>
+    </section>
 
     <section className={`demoCommandBar ${tab !== 'trade' ? 'demoTabHidden' : ''}`}>
       <button className="demoConnect" disabled={busy || !status?.configured} onClick={connect}><Radio/> BAĞLANTIYI TEST ET</button>

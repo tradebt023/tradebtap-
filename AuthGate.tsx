@@ -1,7 +1,7 @@
 import { createPortal } from 'react-dom'
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { Activity, ArrowRight, Eye, EyeOff, KeyRound, LogOut, MailCheck, ShieldCheck, UserRound } from 'lucide-react'
-import { API_BASE, clearUserSessionToken, saveUserSessionToken, userSessionToken } from './api'
+import { API_BASE, clearDemoCredentials, clearUserSessionToken, saveUserSessionToken, userSessionToken } from './api'
 import AdminPanel from './AdminPanel'
 import './auth.css'
 
@@ -213,6 +213,7 @@ export default function AuthGate({children}:{children:ReactNode}) {
     if (sessionToken) {
       try { await fetch(`${API_BASE}/exchange-connections/session`,{method:'DELETE',headers:{Authorization:`Bearer ${sessionToken}`}}) } catch {}
     }
+    clearDemoCredentials(sessionToken)
     try { if (token) await request('/auth/logout',{method:'POST',headers:{Authorization:`Bearer ${token}`}}) } catch { /* local logout still clears the session */ }
     clearUserSessionToken(); setMemberMenuOpen(false); setToken(''); setSession(null); setMode('login'); setMessage('Oturum kapatıldı.')
   }

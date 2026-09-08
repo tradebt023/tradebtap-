@@ -26,6 +26,37 @@ export function clearOwnerAccessToken(): void {
 export function userSessionToken(): string {
   return localStorage.getItem(USER_SESSION_KEY) || sessionStorage.getItem(USER_SESSION_KEY) || ''
 }
+function userSessionId(token=userSessionToken()): string {
+  try {
+    const encoded = token.split('.')[0]
+    const payload = JSON.parse(atob(encoded.replace(/-/g,'+').replace(/_/g,'/') + '='.repeat((4 - encoded.length % 4) % 4)))
+    return typeof payload.sub === 'string' && payload.sub ? payload.sub : ''
+  } catch { return '' }
+}
+
+const demoCredentialsKey = (token=userSessionToken()) => {
+  const id = userSessionId(token)
+  return id ? `protrebot.binance-demo.credentials.${id}` : ''
+}
+
+export function loadDemoCredentials(): {apiKey:string;secretKey:string} {
+  const key = demoCredentialsKey()
+  if (!key) return {apiKey:'',secretKey:''}
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || '{}')
+    return {apiKey:typeof value.apiKey === 'string' ? value.apiKey : '',secretKey:typeof value.secretKey === 'string' ? value.secretKey : ''}
+  } catch { return {apiKey:'',secretKey:''} }
+}
+
+export function saveDemoCredentials(apiKey:string, secretKey:string): void {
+  const key = demoCredentialsKey()
+  if (key) localStorage.setItem(key,JSON.stringify({apiKey,secretKey}))
+}
+
+export function clearDemoCredentials(token=userSessionToken()): void {
+  const key = demoCredentialsKey(token)
+  if (key) localStorage.removeItem(key)
+}
 
 export function saveUserSessionToken(token: string, remember: boolean): void {
   localStorage.removeItem(USER_SESSION_KEY)
